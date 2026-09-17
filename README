@@ -1,0 +1,123 @@
+# Big Data Processing — ECE ING5
+
+Lab work for the ECE Paris *Big Data Processing* course (ING5), covering the two
+core Spark APIs: low-level RDDs and the higher-level DataFrame / Spark SQL API.
+
+## Group information
+
+- **Group:** gr-03
+- Maxence Ravier, `maxence808`
+- Quentin `<git-username>`
+
+## Contents
+
+| Notebook | Topic | Dataset |
+| --- | --- | --- |
+| `word_count.ipynb` | Spark RDDs, transformations vs actions, word count pipeline | *Around the World in Eighty Days* (Project Gutenberg) |
+| `lab_sparksql_and_dataframes.ipynb` | PySpark DataFrames and Spark SQL, exploratory data analysis | NYC TLC yellow taxi trip records (Jan 2019, Jan 2025, full year 2019) |
+
+Both notebooks download their own source data on first run, so no data files are
+committed to the repository.
+
+---
+
+## 1. `word_count.ipynb` — RDD fundamentals
+
+Introduction to the RDD API through a classic word count on the English text of
+*Around the World in Eighty Days*.
+
+**Word count pipeline.** An RDD is built from the raw text file, lines are split
+into words with `flatMap`, and occurrences are counted with `map` +
+`reduceByKey`. The notebook contrasts a transformation (which only records the
+operation and returns an RDD reference, thanks to Spark's lazy evaluation) with
+an action such as `collect()`, which actually triggers the computation and pulls
+the results back to the driver.
+
+The pipeline is then refined one step at a time:
+
+- lower-casing all words
+- filtering out a stop word list
+- sorting alphabetically with `sortByKey`
+- sorting by descending frequency with `sortBy`
+- stripping punctuation and empty tokens
+
+The final cell chains every transformation into a single reusable
+`process_text(rdd, stop_words)` function, as required by the instructions.
+
+**Reading an existing pipeline.** The second part comments, line by line, a
+`map` / `reduceByKey` / `map` chain that computes the average age per name from
+a parallelized list of tuples.
+
+---
+
+## 2. `lab_sparksql_and_dataframes.ipynb` — DataFrames and Spark SQL
+
+Exploratory data analysis on the
+[NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page).
+PySpark is used as the main language for Parts 1 and 2; Part 3 re-answers three
+of the questions in pure Spark SQL.
+
+### Part 1 — Trip-level analysis (PySpark)
+
+A unique `trip_id` is added with `monotonically_increasing_id()`, then the
+January 2019 dataset (~7.7M trips) is explored: passenger counts, shortest and
+longest trips by distance and by duration, busiest and slowest days, hourly and
+time-of-day buckets, day-of-week averages, the relationship between trip
+distance / passenger count and tip amount, the highest `extra` charge, and an
+outlier detection pass.
+
+Selected findings:
+
+- Average passenger count: **1.57**
+- Busiest single day: **25 January 2019** (~292k trips); the afternoon
+  (12:00–17:00) is the busiest time-of-day bucket, and 18:00 the busiest hour
+- Busiest day of the week on average: **Thursday** (~194k trips/day), slowest:
+  **Monday** (~91k)
+- Trip distance correlates moderately with tip amount (**r ≈ 0.53**), while
+  passenger count essentially does not (**r ≈ 0.004**). Average tip rises from
+  $0.94 on trips under 1 mile to $6.22 on trips over 10 miles
+
+### Part 2 — Borough-level analysis (PySpark)
+
+The taxi zone lookup table is joined on `PULocationID` and `DOLocationID` to
+attach a borough to every pickup and dropoff, then aggregated by borough:
+pickups and dropoffs, busy and slow hours, busiest days of the week, average
+trip distance, average fare, and the highest and lowest fares with their
+associated borough. Finally, January 2025 is loaded and compared against
+January 2019.
+
+Selected findings:
+
+- **Manhattan** dominates both pickups (~6.95M) and dropoffs (~6.82M), far
+  ahead of Queens
+- Average trip distance is *inversely* related to density: Staten Island
+  (12.5 mi) and Queens (11.3 mi) lead, Manhattan is last (2.2 mi) — short
+  intra-borough hops in the core, long outbound trips from the periphery.
+  Average fares follow the same pattern, with EWR (Newark Airport) highest at
+  ~$76
+- 2019 vs 2025: average distance more than doubled (2.83 → 5.86 mi), average
+  fare rose from $12.53 to $17.08, average tip from $1.82 to $2.96, while the
+  average passenger count fell from 1.57 to 1.30
+
+### Part 3 — Spark SQL
+
+Three questions re-answered in pure SQL via temporary views (`trips`, `zones`):
+average passenger count, highest `extra` charge, and pickups per borough — the
+latter using a `LEFT JOIN` on the zone lookup table, as required.
+
+### Outliers
+
+The dataset contains a substantial amount of dirty data, documented in the
+notebook: dropoff timestamps at or before the pickup, trips of 831 miles,
+durations of 30 days, fares up to \$623,259, negative fares and negative `extra`
+charges (refunds recorded as trips), and `passenger_count` values of 0 or 9 —
+above the legal capacity of a yellow cab. Pickup dates also fall outside
+January 2019 in a handful of records. These would be filtered or handled
+separately in a production pipeline rather than dropped blindly.
+
+### Where to go from here
+
+The notebook also loads the full year 2019 (~85M trips) to compute the busiest
+season — **spring** (22.9M trips) ahead of winter, fall and summer — and
+includes native Spark 4 DataFrame plots plus ideas for cross-referencing with
+other open datasets.
