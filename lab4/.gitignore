@@ -1,0 +1,8 @@
+data/*
+!data/.gitkeep
+notebooks/.ipynb_checkpoints/
+__pycache__/
+.venv/
+throttle.ctrl
+apicache*/
+logs/
